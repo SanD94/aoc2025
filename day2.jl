@@ -2,20 +2,7 @@ function parse_input(line)
     [Tuple(parse.(Int, split(pair, "-"))) for pair in split(line, ",")]
 end
 
-function is_repeated_sequence(n::Int)
-    s = string(n)
-    len = length(s)
-
-    # Check if exactly 2 repetitions (pattern length = len/2)
-    if len % 2 == 0
-        pattern_len = div(len, 2)
-        pattern = s[1:pattern_len]
-        return pattern * pattern == s
-    end
-    false
-end
-
-function next_repeated_sequence(start::Int, max_val::Int)
+function next_repeated_sequence_exact(start::Int, max_val::Int)
     s = string(start)
     len = length(s)
 
@@ -48,10 +35,69 @@ function next_repeated_sequence(start::Int, max_val::Int)
     return candidate <= max_val ? candidate : nothing
 end
 
+function next_repeated_sequence(start::Int, max_val::Int)
+    s = string(start)
+    len = length(s)
+
+    # Generate all repeated sequences for current digit count
+    candidates = Int[]
+    for pattern_len in 1:div(len, 2)
+        if len % pattern_len != 0
+            continue
+        end
+        pattern = s[1:pattern_len]
+        candidate = parse(Int, pattern^(div(len, pattern_len)))
+        if start <= candidate <= max_val
+            push!(candidates, candidate)
+        end
+        pattern = string(parse(Int, pattern) + 1)
+        if length(pattern) > pattern_len
+            continue
+        end
+        candidate = parse(Int, pattern^(div(len, pattern_len)))
+        if start <= candidate <= max_val
+            push!(candidates, candidate)
+        end
+    end
+
+    if !isempty(candidates)
+        return minimum(candidates)
+    end
+
+    # Move to next digit count and find smallest repeated sequence
+    new_len = len + 1
+    for pattern_len in reverse(1:div(new_len, 2))
+        if new_len % pattern_len != 0
+            continue
+        end
+        pattern = "1" * "0"^(pattern_len - 1)
+        candidate = parse(Int, pattern^(div(new_len, pattern_len)))
+        if candidate <= max_val
+            return candidate
+        end
+    end
+
+    nothing
+end
+
 
 
 # Part 1
 function part1(line)
+    data = parse_input(line)
+    total = 0
+    for (id0, id1) in data
+        n = next_repeated_sequence_exact(id0, id1)
+        while n !== nothing
+            total += n
+            n = next_repeated_sequence_exact(n + 1, id1)
+        end
+    end
+    total
+end
+
+# Part 2
+function part2(line)
     data = parse_input(line)
     total = 0
     for (id0, id1) in data
@@ -64,10 +110,6 @@ function part1(line)
     total
 end
 
-# Part 2
-function part2(line)
-end
-
 # Read input
 line = readline("data/input_d02")
-println(part1(line))
+println(part2(line))
