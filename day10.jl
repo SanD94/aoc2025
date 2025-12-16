@@ -40,6 +40,7 @@ function part1(lines)
     total_presses
 end
 
+CUSTOM_MAX = 1000000
 encode_list(bits) = parse(Int, join(bits), base=2)
 to_parity(nums) = [n % 2 for n in nums]
 
@@ -102,7 +103,7 @@ function part2(lines)
             end
 
             if any(left < 0 for left in remaining)
-                return typemax(Int)
+                return CUSTOM_MAX
             end
 
             # Check memo
@@ -110,15 +111,12 @@ function part2(lines)
                 return memo[remaining_tuple]
             end
 
-            result = typemax(Int)
+            result = CUSTOM_MAX
 
             odd_check = any(left % 2 == 1 for left in remaining)
             if !odd_check
-                result = typemax(Int)
                 sub_res = min_presses_dp(div.(remaining, 2))
-                if sub_res != typemax(Int)
-                    result = 2 * sub_res
-                end
+                result = 2 * sub_res
             end
 
             parity_remaining = remaining |> to_parity |> encode_list
@@ -132,10 +130,7 @@ function part2(lines)
             for (button_press, effect) in combo_effects
 
                 sub_result = min_presses_dp(remaining .- effect)
-
-                if sub_result != typemax(Int)
-                    result = min(result, button_press + sub_result)
-                end
+                result = min(result, button_press + sub_result)
             end
 
 
