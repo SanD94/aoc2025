@@ -40,6 +40,37 @@ function part1(lines)
     total_presses
 end
 
+encode_list(bits) = parse(Int, join(bits), base=2)
+to_parity(nums) = [n % 2 for n in nums]
+
+function get_combo_list(buttons, targets)
+    num_buttons = length(buttons)
+
+    # Precompute all button combination effects
+    combo_effects = []
+    for combo in 0:(1<<num_buttons-1)
+        effects = zeros(Int, length(targets))
+        button_press = 0
+        for i in 0:num_buttons-1
+            if (combo & (1 << i)) != 0
+                button_press += 1
+                for counter_idx in buttons[i+1]
+                    effects[counter_idx+1] += 1
+                end
+            end
+        end
+
+        parity_effect = effects |> to_parity |> encode_list
+        parity_target = targets |> to_parity |> encode_list
+
+        if parity_effect == parity_target && button_press > 0
+            push!(combo_effects, (button_press, effects))
+        end
+    end
+    return combo_effects
+end
+
+
 # Part 2
 function part2(lines)
     total_presses = 0
@@ -56,70 +87,65 @@ function part2(lines)
             push!(buttons, Tuple(indices))
         end
 
-        # Compute radix offsets for mixed-radix encoding
-        radix_offsets = ones(Int, length(targets))
-        for i in 2:length(targets)
-            radix_offsets[i] = radix_offsets[i-1] * (targets[i-1] + 1)
-        end
 
-        # Convert state vector to single integer
-        function state_to_int(state)
-            result = 0
-            for i in 1:length(state)
-                result += state[i] * radix_offsets[i]
+        # DP with memoization: f(remaining_targets) = min presses to reach remaining_targets
+        memo = Dict()
+        combo_list = Vector{Any}(undef, 1 << 16)
+
+
+        function min_presses_dp(remaining)
+            remaining_tuple = Tuple(remaining)
+
+            # Base case: all targets reached
+            if all(remaining[i] == 0 for i in 1:length(remaining))
+                return 0
             end
+
+            if any(left < 0 for left in remaining)
+                return typemax(Int)
+            end
+
+            # Check memo
+            if haskey(memo, remaining_tuple)
+                return memo[remaining_tuple]
+            end
+
+            result = typemax(Int)
+
+            odd_check = any(left % 2 == 1 for left in remaining)
+            if !odd_check
+                result = typemax(Int)
+                sub_res = min_presses_dp(div.(remaining, 2))
+                if sub_res != typemax(Int)
+                    result = 2 * sub_res
+                end
+            end
+
+            parity_remaining = remaining |> to_parity |> encode_list
+
+            if !isassigned(combo_list, parity_remaining + 1)
+                combo_list[parity_remaining+1] = get_combo_list(buttons, remaining)
+            end
+
+            combo_effects = combo_list[parity_remaining+1]
+            # Try each button combination
+            for (button_press, effect) in combo_effects
+
+                sub_result = min_presses_dp(remaining .- effect)
+
+                if sub_result != typemax(Int)
+                    result = min(result, button_press + sub_result)
+                end
+            end
+
+
+            memo[remaining_tuple] = result
             result
         end
 
-        # Convert integer back to state vector
-        function int_to_state(val)
-            state = zeros(Int, length(targets))
-            for i in 1:length(targets)
-                state[i] = div(val, radix_offsets[i]) % (targets[i] + 1)
-            end
-            state
-        end
 
-        target_val = state_to_int(targets)
-
-        # BFS on integer state space
-        visited_dict = Dict(0 => 0)
-        queue = [0]
-        min_presses = typemax(Int)
-
-        while !isempty(queue)
-            current_val = popfirst!(queue)
-            current_presses = visited_dict[current_val]
-
-            if current_val == target_val
-                min_presses = current_presses
-                break
-            end
-
-            current_state = int_to_state(current_val)
-
-            # Try each button
-            for button in buttons
-                next_state = copy(current_state)
-                for counter_idx in button
-                    next_state[counter_idx+1] += 1
-                end
-
-                next_val = state_to_int(next_state)
-
-                # Prune if any counter exceeds its target
-                if any(next_state[i] > targets[i] for i in 1:length(targets))
-                    continue
-                end
-
-                if !haskey(visited_dict, next_val)
-                    visited_dict[next_val] = current_presses + 1
-                    push!(queue, next_val)
-                end
-            end
-        end
-        println(min_presses)
-
+        min_presses = min_presses_dp(targets)
+        println(targets, " ", min_presses)
         total_presses += min_presses
     end
 
