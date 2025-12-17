@@ -11,7 +11,6 @@ function part1(lines)
         shapes[shape_idx] = shape
         i += 4
     end
-    print(shapes)
     # Skip empty line
     i += 1
 
@@ -23,7 +22,6 @@ function part1(lines)
             parts = split(line)
             dims_str = rstrip(parts[1], ':')  # Remove trailing colon
             dims = split(dims_str, "x")
-
             width, height = parse(Int, dims[1]), parse(Int, dims[2])
             counts = parse.(Int, parts[2:end])
             push!(regions, (width, height, counts))
@@ -31,123 +29,31 @@ function part1(lines)
         i += 1
     end
 
-    # Convert shapes to coordinates
-    function shape_to_coords(shape)
-        coords = Set()
-        for (r, row) in enumerate(shape)
-            for (c, char) in enumerate(row)
-                if char == '#'
-                    push!(coords, (r - 1, c - 1))  # 0-indexed
-                end
-            end
-        end
-        return coords
-    end
-
-    # Normalize coordinates to start at (0, 0)
-    function normalize(coords)
-        if isempty(coords)
-            return coords
-        end
-        min_r = minimum(r for (r, c) in coords)
-        min_c = minimum(c for (r, c) in coords)
-        return Set((r - min_r, c - min_c) for (r, c) in coords)
-    end
-
-    # Generate all rotations and flips
-    function get_all_orientations(coords)
-        orientations = Set()
-        for flip in [false, true]
-            current = coords
-            if flip
-                current = Set((r, -c) for (r, c) in current)
-            end
-            for _ in 1:4
-                normalized = normalize(current)
-                push!(orientations, normalized)
-                current = Set((c, -r) for (r, c) in current)
-            end
-        end
-        return [s for s in orientations]
-    end
-
-    # Build orientations for all shapes
-    shape_orientations = Dict()
+    # Count cells in each shape
+    shape_sizes = Dict()
     for (idx, shape) in shapes
-        coords = shape_to_coords(shape)
-        shape_orientations[idx] = get_all_orientations(coords)
-    end
-
-    # Check if presents can fit in region using backtracking
-    function can_fit(width, height, required_counts)
-        grid = Set()
-
-        # Flatten required shapes into list
-        shape_list = []
-        for (idx, count) in enumerate(required_counts)
-            for _ in 1:count
-                push!(shape_list, idx - 1)  # 0-indexed shape index
-            end
-        end
-
-        function backtrack(idx)
-            if idx > length(shape_list)
-                return true
-            end
-
-            shape_idx = shape_list[idx]
-            for orientation in shape_orientations[shape_idx]
-                # Try all positions
-                for r in 0:(height-1)
-                    for c in 0:(width-1)
-                        # Check if we can place this orientation at (r, c)
-                        cells_to_place = []
-                        can_place = true
-
-                        for (dr, dc) in orientation
-                            nr, nc = r + dr, c + dc
-                            if nr >= height || nc >= width
-                                can_place = false
-                                break
-                            end
-                            if (nr, nc) in grid
-                                can_place = false
-                                break
-                            end
-                            push!(cells_to_place, (nr, nc))
-                        end
-
-                        if can_place
-                            # Place shape
-                            for cell in cells_to_place
-                                push!(grid, cell)
-                            end
-
-                            if backtrack(idx + 1)
-                                return true
-                            end
-
-                            # Remove shape
-                            for cell in cells_to_place
-                                delete!(grid, cell)
-                            end
-                        end
-                    end
+        cell_count = 0
+        for row in shape
+            for char in row
+                if char == '#'
+                    cell_count += 1
                 end
             end
-            return false
         end
-
-        return backtrack(1)
+        shape_sizes[idx] = cell_count
     end
 
     # Count regions that can fit all presents
     count = 0
     for (width, height, counts) in regions
-        if can_fit(width, height, counts)
+        total_cells_needed = 0
+        for (idx, shape_count) in enumerate(counts)
+            total_cells_needed += shape_count * shape_sizes[idx-1]
+        end
+        region_size = width * height
+        if total_cells_needed <= region_size
             count += 1
         end
-        print(count)
     end
 
     return count
